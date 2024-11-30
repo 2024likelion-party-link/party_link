@@ -3,7 +3,9 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-secret_file_path = os.getenv('SECRET_KEY_FILE', '/PartyLink/secret_key.json')
+
+# 환경 변수 또는 기본 경로 설정
+secret_file_path = os.getenv('SECRET_KEY_FILE', BASE_DIR / 'secret_key.json')
 
 with open(secret_file_path) as secret_file:
     secrets = json.load(secret_file)
