@@ -7,33 +7,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.room_id = self.scope["url_route"]["kwargs"]["room_id"]
         self.room_group_name = f"chat_{self.room_id}"
 
-        # 방에 참가
+        # Join room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
-        # 방에서 나가기
+        # Leave room group
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
+        message = data["message"]
         sender = data["sender"]
-        content = data["content"]
 
         # 메시지를 데이터베이스에 저장
-        room = await ChatRoom.objects.aget(room_id=self.room_id)
-        await Message.objects.acreate(room=room, sender=sender, content=content)
+        try:
+            room = await ChatRoom.objects.aget(room_id=self.room_id)
+            await Message.objects.acreate(room=room, sender=sender, content=message)
+        except ChatRoom.DoesNotExist:
+            await self.send(text_data=json.dumps({"error": "Room not found"}))
+            return
 
-        # 메시지를 방의 다른 사용자들에게 브로드캐스트
+        # Send message to room group
         await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                "type": "chat_message",
-                "sender": sender,
-                "content": content,
-            },
+            self.room_group_name, {"type": "chat_message", "message": message, "sender": sender}
         )
 
     async def chat_message(self, event):
-        # 클라이언트로 메시지 전송
-        await self.send(text_data=json.dumps({"sender": event["sender"], "content": event["content"]}))
+        message = event["message"]
+        sender = event["sender"]
+
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({"message": message, "sender": sender}))

@@ -26,7 +26,7 @@ ALLOWED_HOSTS = ['*']
 
 
 # Application definition
-# a
+#
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
@@ -133,7 +133,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-ASGI_APPLICATION = 'PartyLink.routing.application'
+ASGI_APPLICATION = 'PartyLink.asgi.application'
 
 
 CHANNEL_LAYERS = {
