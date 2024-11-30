@@ -44,7 +44,7 @@ class GetParticipantsView(APIView):
 class GetGamesView(APIView):
     def get(self, request):
         games = [
-            {"id": "game1", "name": "손병호 게임"},
-            {"id": "game2", "name": "이미지 게임"}
+            {"id": "handGame", "name": "손병호 게임"},
+            {"id": "imageGame", "name": "이미지 게임"}
         ]
         return Response({"games": games}, status=status.HTTP_200_OK)
