@@ -28,23 +28,44 @@ class CreateRoomView(APIView):
 
         return Response({"room_id": str(room.room_id)}, status=status.HTTP_201_CREATED)
 
+# class JoinRoomView(APIView):
+#     def post(self, request, room_id):
+#         nickname = request.data.get('nickname')
+
+#         # 참가자 역할 설정 (기본값: 'participant')
+#         role = 'participant'
+
+#         # 참가자를 방에 추가할 때 역할과 함께 저장
+#         timestamp = time.time()  # 현재 시간으로 참여 순서 추적
+
+#         # 참가자가 방에 추가되면 성공 (참여자가 이미 존재하면 False 반환)
+#         added = redis_client.zadd(f"room:{room_id}:participants", {f"{nickname}:{role}": timestamp})
+        
+#         if added:
+#             return Response({"message": "Joined room"}, status=status.HTTP_200_OK)
+#         return Response({"error": "Failed to join room"}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class JoinRoomView(APIView):
     def post(self, request, room_id):
         nickname = request.data.get('nickname')
 
+        if not nickname:
+            return Response(
+                {"error": "nickname is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # 참가자 역할 설정 (기본값: 'participant')
         role = 'participant'
 
-        # 참가자를 방에 추가할 때 역할과 함께 저장
-        timestamp = time.time()  # 현재 시간으로 참여 순서 추적
-
-        # 참가자가 방에 추가되면 성공 (참여자가 이미 존재하면 False 반환)
+        # Redis에 닉네임과 역할 저장
+        timestamp = time.time()
         added = redis_client.zadd(f"room:{room_id}:participants", {f"{nickname}:{role}": timestamp})
         
         if added:
-            return Response({"message": "Joined room"}, status=status.HTTP_200_OK)
+            return Response({"message": "Joined room", "room_id": room_id, "nickname": nickname}, status=status.HTTP_200_OK)
         return Response({"error": "Failed to join room"}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class GetParticipantsView(APIView):
     def get(self, request, room_id):

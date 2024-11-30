@@ -1,13 +1,28 @@
-from django.shortcuts import render, redirect
-from .models import ChatRoom
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import ChatRoom, Message
 
-def create_room(request):
-    if request.method == "POST":
-        name = request.POST.get("name")
-        room = ChatRoom.objects.create(name=name)
-        return redirect(f'/chat/room/{room.room_id}/?nickname={name}')
-    return render(request, 'create_room.html')
+class RoomDetailView(APIView):
+    def get(self, request, room_id):
+        try:
+            room = ChatRoom.objects.get(room_id=room_id)
+            messages = Message.objects.filter(room=room).values("sender", "content", "timestamp")
+            return Response({"room_id": room_id, "messages": list(messages)}, status=status.HTTP_200_OK)
+        except ChatRoom.DoesNotExist:
+            return Response({"error": "Room does not exist"}, status=status.HTTP_404_NOT_FOUND)
 
-def room(request, room_id):
-    nickname = request.GET.get('nickname', 'Anonymous')
-    return render(request, 'room.html', {"room_id": room_id, "nickname":nickname})
+class SendMessageView(APIView):
+    def post(self, request, room_id):
+        sender = request.data.get("sender")
+        content = request.data.get("content")
+
+        if not sender or not content:
+            return Response({"error": "sender and content are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            room = ChatRoom.objects.get(room_id=room_id)
+            message = Message.objects.create(room=room, sender=sender, content=content)
+            return Response({"sender": message.sender, "content": message.content, "timestamp": message.timestamp}, status=status.HTTP_201_CREATED)
+        except ChatRoom.DoesNotExist:
+            return Response({"error": "Room does not exist"}, status=status.HTTP_404_NOT_FOUND)
