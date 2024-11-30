@@ -1,20 +1,12 @@
 from django.db import models
+import uuid
+from room.models import Room
 
-class ShopUser(models.Model):
-    shop_user_email = models.EmailField(unique=True)
-
-class VisitorUser(models.Model):
-    visitor_user_email = models.EmailField(unique=True)
-
-class ChatRoom(models.Model):
-    shop_user = models.ForeignKey(ShopUser, on_delete=models.CASCADE)
-    visitor_user = models.ForeignKey(VisitorUser, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    class Meta:
-        unique_together = ('shop_user', 'visitor_user')
-        
 class Message(models.Model):
-    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
-    sender_email = models.EmailField()
-    text = models.TextField()
+    room = models.ForeignKey(Room, related_name="messages", on_delete=models.CASCADE)
+    sender = models.CharField(max_length=100)
+    content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["timestamp"]
