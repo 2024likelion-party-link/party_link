@@ -22,7 +22,7 @@ class CreateRoomView(APIView):
         # Room 객체 생성
         room = Room.objects.create(host_name=host_name)
 
-  # Redis에 호스트 정보 저장
+        # Redis에 호스트 정보 저장
         redis_client.set(f"room:{room.room_id}:host", host_name)
 
         return Response({"room_id": str(room.room_id)}, status=status.HTTP_201_CREATED)
@@ -39,3 +39,12 @@ class GetParticipantsView(APIView):
     def get(self, request, room_id):
         participants = redis_client.smembers(f"room:{room_id}")
         return Response({"participants": list(map(lambda x: x.decode(), participants))})
+
+# 게임 목록 반환
+class GetGamesView(APIView):
+    def get(self, request):
+        games = [
+            {"id": "game1", "name": "손병호 게임"},
+            {"id": "game2", "name": "이미지 게임"}
+        ]
+        return Response({"games": games}, status=status.HTTP_200_OK)
