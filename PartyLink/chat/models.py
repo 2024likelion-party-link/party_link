@@ -1,20 +1,18 @@
 from django.db import models
+from django.contrib.auth.models import User
 
-class ShopUser(models.Model):
-    shop_user_email = models.EmailField(unique=True)
-
-class VisitorUser(models.Model):
-    visitor_user_email = models.EmailField(unique=True)
 
 class ChatRoom(models.Model):
-    shop_user = models.ForeignKey(ShopUser, on_delete=models.CASCADE)
-    visitor_user = models.ForeignKey(VisitorUser, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    class Meta:
-        unique_together = ('shop_user', 'visitor_user')
-        
-class Message(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
+class ChatMessage(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
-    sender_email = models.EmailField()
-    text = models.TextField()
+    message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username}: {self.message[:50]}"
