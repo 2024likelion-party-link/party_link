@@ -3,7 +3,7 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-secret_file_path = os.getenv('SECRET_KEY_FILE', '/PartyLink/secret_key.json')
+secret_file_path = os.getenv('SECRET_KEY_FILE', 'secret_key.json')
 
 with open(secret_file_path) as secret_file:
     secrets = json.load(secret_file)
@@ -129,14 +129,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-ASGI_APPLICATION = 'PartyLink.asgi.application'
+ASGI_APPLICATION = 'PartyLink.routing.application'
 
 
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [("127.0.0.1", 6379)],  # Redis 서버 호스트와 포트
+            "hosts": [("127.0.0.1", 6380)],  # Redis 서버 호스트와 포트
         },
     },
 }

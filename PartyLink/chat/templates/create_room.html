@@ -1,0 +1,6 @@
+<form method="post">
+  {% csrf_token %}
+  <label for="name">Enter your nickname:</label>
+  <input type="text" name="name" required />
+  <button type="submit">Create Room</button>
+</form>
