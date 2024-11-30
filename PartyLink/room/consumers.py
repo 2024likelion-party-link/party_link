@@ -1,22 +1,32 @@
 import json
+import uuid
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from .models import Room, Participant
+from django.core.cache import cache
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_id = self.scope['url_route']['kwargs']['room_id']
         self.room_group_name = f'room_{self.room_id}'
 
-        # 방 그룹에 WebSocket 추가
+        # 참가자가 방에 연결되면, WebSocket 연결을 허용
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
         await self.accept()
 
+        # 기존 참가자 목록 보내기
+        participants_key = f"room:{self.room_id}:participants"
+        participants = cache.lrange(participants_key, 0, -1)
+        participants_data = [p.decode('utf-8').split(":")[1] for p in participants]
+        await self.send(json.dumps({'participants': participants_data}))
+
     async def disconnect(self, close_code):
-        # 방 그룹에서 WebSocket 제거
+        # 참가자가 나가면 목록에서 제거
+        participants_key = f"room:{self.room_id}:participants"
+        cache.lrem(participants_key, 0, self.channel_name)  # 채널을 이용해 제거
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
@@ -24,43 +34,24 @@ class RoomConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        action = data.get('action')
+        nickname = data['nickname']
 
-        if action == 'join':
-            nickname = data['nickname']
-            await self.add_participant(nickname)
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'room_message',
-                    'message': f'{nickname} joined the room!'
-                }
-            )
-        elif action == 'leave':
-            nickname = data['nickname']
-            await self.remove_participant(nickname)
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'room_message',
-                    'message': f'{nickname} left the room.'
-                }
-            )
+        # 참가자 추가
+        participants_key = f"room:{self.room_id}:participants"
+        participant_id = str(uuid.uuid4())  # 고유 ID 생성
+        cache.lpush(participants_key, f"{participant_id}:{nickname}")
 
-    async def room_message(self, event):
-        message = event['message']
+        # 실시간 참가자 목록 업데이트
+        participants = cache.lrange(participants_key, 0, -1)
+        participants_data = [p.decode('utf-8').split(":")[1] for p in participants]
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'send_participants',
+                'participants': participants_data
+            }
+        )
 
-        # WebSocket에 메시지 보내기
-        await self.send(text_data=json.dumps({
-            'message': message
-        }))
-
-    @sync_to_async
-    def add_participant(self, nickname):
-        room = Room.objects.get(room_id=self.room_id)
-        Participant.objects.get_or_create(room=room, nickname=nickname, role='participant')
-
-    @sync_to_async
-    def remove_participant(self, nickname):
-        room = Room.objects.get(room_id=self.room_id)
-        Participant.objects.filter(room=room, nickname=nickname).delete()
+    
+    async def send_participants(self, event):
+        await self.send(json.dumps({'participants': event['participants']}))
