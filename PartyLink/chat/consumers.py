@@ -1,10 +1,11 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
+from django.conf import settings
 import redis
 
 # Redis 클라이언트 설정
-redis_client = redis.StrictRedis(host="127.0.0.1", port=6379, db=0)
+redis_client = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
