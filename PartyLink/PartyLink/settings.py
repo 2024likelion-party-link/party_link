@@ -23,8 +23,10 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 
+
+
 # Application definition
-# a
+#
 INSTALLED_APPS = [
     'daphne',
     'django.contrib.admin',
@@ -138,7 +140,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [("127.0.0.1", 6379)],  # Redis 서버 호스트와 포트
+            "hosts": [("127.0.0.1", 6380)],  # Redis 서버 호스트와 포트
         },
     },
 }

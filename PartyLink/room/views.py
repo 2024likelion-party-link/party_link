@@ -67,7 +67,6 @@ class JoinRoomView(APIView):
         response.set_cookie("user_token", user_token, httponly=True, max_age=3600)
         return response
 
-
 class GetParticipantsView(APIView):
     def get(self, request, room_id):
         # 쿠키에서 사용자 토큰 확인
