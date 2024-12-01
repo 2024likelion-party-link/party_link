@@ -146,3 +146,16 @@ CHANNEL_LAYERS = {
 # Redis 설정
 REDIS_HOST = 'localhost'  # Redis 서버의 호스트 (로컬에서 실행 중인 경우 localhost)
 REDIS_PORT = 6379         # Redis 기본 포트
+
+
+# settings.py
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',  # Redis 서버 주소
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+

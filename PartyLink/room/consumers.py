@@ -1,9 +1,13 @@
 import json
 import uuid
+import redis
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from .models import Room, Participant
-from django.core.cache import cache
+from django.conf import settings
+
+# Redis 클라이언트 설정
+redis_client = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -19,14 +23,14 @@ class RoomConsumer(AsyncWebsocketConsumer):
 
         # 기존 참가자 목록 보내기
         participants_key = f"room:{self.room_id}:participants"
-        participants = cache.lrange(participants_key, 0, -1)
+        participants = redis_client.lrange(participants_key, 0, -1)  # redis-py로 수정
         participants_data = [p.decode('utf-8').split(":")[1] for p in participants]
         await self.send(json.dumps({'participants': participants_data}))
 
     async def disconnect(self, close_code):
         # 참가자가 나가면 목록에서 제거
         participants_key = f"room:{self.room_id}:participants"
-        cache.lrem(participants_key, 0, self.channel_name)  # 채널을 이용해 제거
+        redis_client.lrem(participants_key, 0, self.channel_name)  # redis-py로 수정
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
@@ -39,10 +43,10 @@ class RoomConsumer(AsyncWebsocketConsumer):
         # 참가자 추가
         participants_key = f"room:{self.room_id}:participants"
         participant_id = str(uuid.uuid4())  # 고유 ID 생성
-        cache.lpush(participants_key, f"{participant_id}:{nickname}")
+        redis_client.lpush(participants_key, f"{participant_id}:{nickname}")  # redis-py로 수정
 
         # 실시간 참가자 목록 업데이트
-        participants = cache.lrange(participants_key, 0, -1)
+        participants = redis_client.lrange(participants_key, 0, -1)  # redis-py로 수정
         participants_data = [p.decode('utf-8').split(":")[1] for p in participants]
         await self.channel_layer.group_send(
             self.room_group_name,
@@ -52,6 +56,5 @@ class RoomConsumer(AsyncWebsocketConsumer):
             }
         )
 
-    
     async def send_participants(self, event):
         await self.send(json.dumps({'participants': event['participants']}))
