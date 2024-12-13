@@ -57,6 +57,7 @@ class MessageView(APIView):
                         "sender": message.sender,
                         "content": message.content,
                         "timestamp": message.timestamp.isoformat(),
+                        "is_self": sender == redis_client.get(f"user:{user_token}:nickname").decode(),  # 본인 확인
                     },
                 )
 

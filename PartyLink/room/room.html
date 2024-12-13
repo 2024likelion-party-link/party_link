@@ -3,58 +3,78 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebSocket Chat</title>
+    <title>Chat Room</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      #messages {
+        margin-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+      }
+      #messages li {
+        margin-bottom: 10px;
+      }
+    </style>
   </head>
   <body>
-    <h2>Room Chat</h2>
+    <h1>Chat Room</h1>
     <div>
-      <input type="text" id="nickname" placeholder="Enter your nickname" />
-      <button onclick="joinRoom()">Join Room</button>
+      <label for="message">Message:</label>
+      <input type="text" id="message" placeholder="Type your message" />
+      <button id="sendButton">Send</button>
     </div>
-    <ul id="participants-list"></ul>
+    <ul id="messages"></ul>
 
     <script>
-      let socket;
-      const roomId = "9f9a4b9c-f24c-40d3-ba96-7a71398f5c5d"; // 방 ID를 실제 방 ID로 변경하세요.
-      const url = `ws://127.0.0.1:8000/ws/rooms/${roomId}/`; // WebSocket URL
+      const roomId = "75fceb7c-b69a-4ffa-ab78-9021cad4a4da"; // Replace with your room ID
+      const userToken = "your_user_token"; // Replace with actual user token
+      const socket = new WebSocket(`ws://localhost:8000/ws/room/${roomId}/`);
 
-      function joinRoom() {
-        const nickname = document.getElementById("nickname").value;
+      document.cookie = `user_token=${userToken}; path=/`;
 
-        // WebSocket 연결
-        socket = new WebSocket(url);
+      const messageInput = document.getElementById("message");
+      const sendButton = document.getElementById("sendButton");
+      const messagesList = document.getElementById("messages");
 
-        // WebSocket 연결 성공 시
-        socket.onopen = function (event) {
-          console.log("WebSocket connection established");
-          // 참가자 정보를 서버로 전송
-          socket.send(JSON.stringify({ nickname: nickname }));
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "chat.message") {
+          const listItem = document.createElement("li");
+          listItem.textContent = `${data.sender}: ${data.content}`;
+          if (data.is_self) {
+            listItem.textContent += " (나)";
+          }
+          messagesList.appendChild(listItem);
+        }
+      };
+
+      sendButton.addEventListener("click", () => {
+        const messageContent = messageInput.value.trim();
+        if (!messageContent) return;
+
+        const messageData = {
+          content: messageContent,
         };
 
-        // 서버에서 메시지를 받을 때
-        socket.onmessage = function (event) {
-          const data = JSON.parse(event.data);
-          const participantsList = document.getElementById("participants-list");
-          participantsList.innerHTML = ""; // 기존 참가자 목록 초기화
-
-          // 참가자 목록을 HTML에 표시
-          data.participants.forEach((participant) => {
-            const li = document.createElement("li");
-            li.textContent = participant;
-            participantsList.appendChild(li);
-          });
-        };
-
-        // WebSocket 연결이 닫힐 때
-        socket.onclose = function (event) {
-          console.log("WebSocket connection closed");
-        };
-
-        // WebSocket 연결 중 오류가 발생했을 때
-        socket.onerror = function (error) {
-          console.error("WebSocket error: ", error);
-        };
-      }
+        fetch(`/api/rooms/${roomId}/messages/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(messageData),
+          credentials: "same-origin",
+        }).then((response) => {
+          if (response.ok) {
+            messageInput.value = ""; // Clear input on success
+          } else {
+            console.error("Failed to send message");
+          }
+        });
+      });
     </script>
   </body>
 </html>
