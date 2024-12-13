@@ -1,15 +1,13 @@
-import uuid
-import redis
 import time
 from django.utils.crypto import get_random_string
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Room
+from .models import Room  # Assuming Room model exists
+import redis
 
-# Redis 클라이언트 설정
-redis_client = redis.StrictRedis(host="127.0.0.1", port=6379, db=0)
-
+# Initialize redis client
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 class CreateRoomView(APIView):
     def post(self, request):
@@ -21,8 +19,19 @@ class CreateRoomView(APIView):
         # Room 객체 생성
         room = Room.objects.create(host_name=host_name)
 
-        # Redis에 방 정보 저장
-        redis_client.set(f"room:{room.room_id}:info", "created", ex=3600)  # TTL 1시간
+        room_info_key = f"room:{room.room_id}:info"
+        
+        # If the key exists and is not a hash, delete it to avoid type conflicts
+        if redis_client.exists(room_info_key):
+            current_type = redis_client.type(room_info_key)
+            if current_type != b'hash':  # Not a hash, so delete it
+                redis_client.delete(room_info_key)
+
+        # Set the room information as a hash and store the host_name
+        redis_client.hset(room_info_key, "host_name", host_name)
+        redis_client.expire(room_info_key, 3600)  # TTL for the room info (1 hour)
+
+        # Store the participants (using a sorted set)
         timestamp = time.time()
         redis_client.zadd(f"room:{room.room_id}:participants", {f"{host_name}:host": timestamp})
         redis_client.expire(f"room:{room.room_id}:participants", 3600)  # TTL 1시간
@@ -43,6 +52,6 @@ class GetGamesView(APIView):
     def get(self, request):
         games = [
             {"id": "handGame", "name": "손병호 게임"},
-            {"id": "imageGame", "name": "이미지 게임"}
+            {"id": "imageGame", "name": "이미지 게임"},
         ]
         return Response({"games": games}, status=status.HTTP_200_OK)
