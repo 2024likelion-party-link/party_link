@@ -3,57 +3,95 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WebSocket Chat</title>
+    <title>WebSocket Participants</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #participants {
+        margin-top: 20px;
+      }
+      .participant {
+        margin-bottom: 5px;
+      }
+    </style>
   </head>
   <body>
-    <h2>Room Chat</h2>
-    <div>
-      <input type="text" id="nickname" placeholder="Enter your nickname" />
-      <button onclick="joinRoom()">Join Room</button>
+    <h1>Room Participants</h1>
+    <label for="nickname">Enter your nickname:</label>
+    <input type="text" id="nickname" placeholder="Your nickname" />
+    <button id="joinButton">Join Room</button>
+
+    <h2>Participants</h2>
+    <div id="participants">
+      <p>No participants yet.</p>
     </div>
-    <ul id="participants-list"></ul>
 
     <script>
-      let socket;
-      const roomId = "9f9a4b9c-f24c-40d3-ba96-7a71398f5c5d"; // 방 ID를 실제 방 ID로 변경하세요.
-      const url = `ws://127.0.0.1:8000/ws/rooms/${roomId}/`; // WebSocket URL
+      const roomId = "12345"; // Example room ID
+      const socket = new WebSocket(`ws://localhost:8000/ws/room/${roomId}/`);
+      let userId = localStorage.getItem("userId");
 
-      function joinRoom() {
-        const nickname = document.getElementById("nickname").value;
+      const nicknameInput = document.getElementById("nickname");
+      const joinButton = document.getElementById("joinButton");
+      const participantsDiv = document.getElementById("participants");
 
-        // WebSocket 연결
-        socket = new WebSocket(url);
+      // Handle WebSocket connection
+      socket.onopen = function () {
+        console.log("WebSocket connection established.");
+      };
 
-        // WebSocket 연결 성공 시
-        socket.onopen = function (event) {
-          console.log("WebSocket connection established");
-          // 참가자 정보를 서버로 전송
-          socket.send(JSON.stringify({ nickname: nickname }));
-        };
+      socket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
 
-        // 서버에서 메시지를 받을 때
-        socket.onmessage = function (event) {
-          const data = JSON.parse(event.data);
-          const participantsList = document.getElementById("participants-list");
-          participantsList.innerHTML = ""; // 기존 참가자 목록 초기화
+        if (data.type === "self_id") {
+          // Save userId to localStorage
+          userId = data.userId;
+          localStorage.setItem("userId", userId);
+          console.log("Received userId:", userId);
+        }
 
-          // 참가자 목록을 HTML에 표시
-          data.participants.forEach((participant) => {
-            const li = document.createElement("li");
-            li.textContent = participant;
-            participantsList.appendChild(li);
-          });
-        };
+        if (data.participants) {
+          updateParticipantsList(data.participants);
+        }
+      };
 
-        // WebSocket 연결이 닫힐 때
-        socket.onclose = function (event) {
-          console.log("WebSocket connection closed");
-        };
+      socket.onclose = function () {
+        console.log("WebSocket connection closed.");
+      };
 
-        // WebSocket 연결 중 오류가 발생했을 때
-        socket.onerror = function (error) {
-          console.error("WebSocket error: ", error);
-        };
+      joinButton.addEventListener("click", () => {
+        const nickname = nicknameInput.value.trim();
+
+        if (!nickname) {
+          alert("Please enter a nickname.");
+          return;
+        }
+
+        // Send join message
+        socket.send(
+          JSON.stringify({
+            type: "join",
+            nickname: nickname,
+            userId: userId, // Send userId if it exists
+          })
+        );
+      });
+
+      function updateParticipantsList(participants) {
+        participantsDiv.innerHTML = "";
+
+        participants.forEach((participant) => {
+          const div = document.createElement("div");
+          div.className = "participant";
+          div.textContent = participant.nickname; // Nickname already includes (나) if applicable
+          participantsDiv.appendChild(div);
+        });
+
+        if (participants.length === 0) {
+          participantsDiv.innerHTML = "<p>No participants yet.</p>";
+        }
       }
     </script>
   </body>
