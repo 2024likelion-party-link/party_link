@@ -87,13 +87,13 @@ class RoomConsumer(AsyncWebsocketConsumer):
             pass
 
     async def send_message(self, event):
-        await self.send(json.dumps(event['message']))
+        await self.send(json.dumps(event['message'], ensure_ascii=False))  
 
     async def add_participant(self, nickname, user_id, is_host=False):
         if use_redis:
             participants_key = f"room:{self.room_id}:participants"
             # Check if the is_host flag is correctly added
-            redis_client.lpush(participants_key, f"{user_id}:{nickname}:{'True' if is_host else 'False'}")
+            redis_client.rpush(participants_key, f"{user_id}:{nickname}:{'True' if is_host else 'False'}")
         else:
             self.channel_layer.rooms[self.room_id][self.channel_name] = {
                 'nickname': nickname,
@@ -127,7 +127,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
         # Directly use the decoded nickname
         # No need to re-encode/decode for Unicode escape
                     nickname = nickname  # Ensure it's already in the right encoding
-        
+                    
+
         # Check if this participant is the host and ensure only one host is added
                     if is_host == 'True' and not host_added:
                         participants_data.append({

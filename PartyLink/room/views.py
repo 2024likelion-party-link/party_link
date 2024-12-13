@@ -1,4 +1,5 @@
 import time
+import uuid
 from django.utils.crypto import get_random_string
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -33,18 +34,21 @@ class CreateRoomView(APIView):
 
         # Store the participants (using a sorted set)
         timestamp = time.time()
+
+        # 유저 아이디 생성
+        user_id = str(uuid.uuid4())
+        
+        # # 사용자 이름과 user_id를 Redis에 저장
+        # redis_client.hset(f"user:{user_id}", "nickname", host_name)
+
+        # 참가자 목록에 해당 user_id와 nickname을 추가
         redis_client.zadd(f"room:{room.room_id}:participants", {f"{host_name}:host": timestamp})
-        redis_client.expire(f"room:{room.room_id}:participants", 3600)  # TTL 1시간
 
-        # 사용자 토큰 생성 및 저장
-        user_token = get_random_string(32)
-        redis_client.set(f"user:{user_token}:nickname", host_name, ex=3600)
-
-        # 쿠키에 토큰 설정
-        response = Response({"room_id": str(room.room_id)}, status=status.HTTP_201_CREATED)
-        response.set_cookie("user_token", user_token, httponly=True, max_age=3600)
-
-        return response
+        # 응답으로 user_id와 room_id 반환
+        return Response({
+            "room_id": str(room.room_id),
+            "nickname": host_name
+        }, status=status.HTTP_201_CREATED)
 
 
 # 게임 목록 반환
