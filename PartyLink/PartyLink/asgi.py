@@ -4,6 +4,10 @@ from channels.security.websocket import AllowedHostsOriginValidator
 from room.routing import websocket_urlpatterns as room_websocket
 from chat.routing import websocket_urlpatterns as chat_websocket
 from django.core.asgi import get_asgi_application
+import os
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'PartyLink.settings')
+
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),

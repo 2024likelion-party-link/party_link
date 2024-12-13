@@ -1,96 +1,103 @@
 import json
 import uuid
 from channels.generic.websocket import AsyncWebsocketConsumer
-from asgiref.sync import sync_to_async
-from django.conf import settings
 import redis
 
-# Redis 클라이언트 설정
-use_redis = hasattr(settings, 'REDIS_HOST') and hasattr(settings, 'REDIS_PORT')
-redis_client = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0) if use_redis else None
-
+# Redis 설정
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 
 class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_id = self.scope['url_route']['kwargs']['room_id']
-        self.room_group_name = f'room_{self.room_id}'
-        
-        # 메모리 기반 접근 초기화
-        if not hasattr(self.channel_layer, "rooms"):
-            self.channel_layer.rooms = {}
-        if self.room_id not in self.channel_layer.rooms:
-            self.channel_layer.rooms[self.room_id] = {}
-
-        # 그룹 추가 및 WebSocket 연결 허용
+        self.room_group_name = f"room_{self.room_id}"
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
-        # 기존 참가자 목록 전송
+        # Redis에서 참가자 정보 가져오기
         participants = await self.get_participants()
-        await self.send(json.dumps({'type': 'participants', 'participants': participants}))
+
+        await self.send(json.dumps({
+            "type": "participants_update",
+            "participants": participants
+        }))
 
     async def disconnect(self, close_code):
-        if use_redis:
-            participants_key = f"room:{self.room_id}:participants"
-            redis_client.lrem(participants_key, 0, self.channel_name)
-        else:
-            if self.room_id in self.channel_layer.rooms:
-                self.channel_layer.rooms[self.room_id].pop(self.channel_name, None)
-
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        message_type = data.get('type')
+        message_type = data.get("type")
 
-        if message_type == 'join':
-            nickname = data['nickname']
+        if message_type == "join":
+            nickname = data.get("nickname")
             user_id = str(uuid.uuid4())
+            is_host = False
 
             # 참가자 추가
-            await self.add_participant(nickname, user_id)
+            await self.add_participant(nickname, user_id, is_host)
 
-            # 참가자 목록 갱신 및 그룹 전송
+            # 참가자 목록 갱신
             participants = await self.get_participants()
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'send_message',
-                    'message': {
-                        'type': 'join',
-                        'nickname': nickname,
-                        'userId': user_id,
-                        'participants': participants
-                    }
+                    "type": "update_participants",
+                    "participants": participants
                 }
             )
 
-            # 본인에게 고유 ID 전송
-            await self.send(json.dumps({'type': 'self_id', 'userId': user_id}))
+            # 참가자에게 자신 정보 전송
+            await self.send(json.dumps({"type": "self_id", "userId": user_id}))
 
-        elif message_type == 'message':
-            # 메시지 처리 로직 추가 가능
-            pass
+        elif message_type == "select_game":
+            game_id = data.get("game_id")
+            is_host = await self.is_host(data.get("user_token"))  # 호스트 여부 확인
+            if is_host:
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        "type": "game_selected",
+                        "game_id": game_id
+                    }
+                )
+            else:
+                await self.send(json.dumps({
+                    "type": "error",
+                    "message": "Only the host can select the game."
+                }))
 
-    async def send_message(self, event):
-        await self.send(json.dumps(event['message']))
+    async def update_participants(self, event):
+        participants = event["participants"]
+        await self.send(json.dumps({"type": "participants_update", "participants": participants}))
 
-    async def add_participant(self, nickname, user_id):
-        if use_redis:
-            participants_key = f"room:{self.room_id}:participants"
-            redis_client.lpush(participants_key, f"{user_id}:{nickname}")
-        else:
-            self.channel_layer.rooms[self.room_id][self.channel_name] = {'nickname': nickname, 'user_id': user_id}
+    async def game_selected(self, event):
+        game_id = event["game_id"]
+        await self.send(json.dumps({"type": "game_selected", "game_id": game_id}))
+
+    async def add_participant(self, nickname, user_id, is_host):
+        participants_key = f"room:{self.room_id}:participants"
+        redis_client.lpush(participants_key, f"{user_id}:{nickname}:{is_host}")
+        redis_client.expire(participants_key, 3600)
 
     async def get_participants(self):
-        if use_redis:
-            participants_key = f"room:{self.room_id}:participants"
-            participants = redis_client.lrange(participants_key, 0, -1)
-            return [{'userId': p.decode('utf-8').split(':')[0], 'nickname': p.decode('utf-8').split(':')[1]} for p in participants]
-        else:
-            if self.room_id in self.channel_layer.rooms:
-                return [
-                    {'userId': data['user_id'], 'nickname': data['nickname']}
-                    for data in self.channel_layer.rooms[self.room_id].values()
-                ]
-            return []
+        participants_key = f"room:{self.room_id}:participants"
+        participants = redis_client.lrange(participants_key, 0, -1)
+        return [
+            {
+                "userId": p.decode("utf-8").split(":")[0],
+                "nickname": p.decode("utf-8").split(":")[1],
+                "is_host": p.decode("utf-8").split(":")[2] == "True"
+            }
+            for p in participants
+        ]
+
+    async def is_host(self, user_token):
+        """Check if the user is the host of the room."""
+        host_token = await self.get_host_token()
+        return user_token == host_token
+
+    async def get_host_token(self):
+        """Retrieve the host token from Redis."""
+        host_info_key = f"room:{self.room_id}:info"
+        host_token = redis_client.hget(host_info_key, "host_token")
+        return host_token.decode("utf-8") if host_token else None
