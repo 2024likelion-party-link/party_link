@@ -1,18 +1,9 @@
-import json
-import uuid
-from django.urls import path, re_path
-from django.shortcuts import render
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-from channels.layers import get_channel_layer
-
-from .views import create_room, room_view
-
+from django.urls import path
+from .views import CreateRoomView, JoinRoomView, GetParticipantsView, GetGamesView
 
 urlpatterns = [
-    path('create-room/', create_room, name='create-room'),
-    path('room/<str:room_id>/', room_view, name='room-view'),
+    path('create-room/', CreateRoomView.as_view(), name='create-room'),
+    path('join-room/<uuid:room_id>/', JoinRoomView.as_view(), name='join-room'),
+    path('participants/<uuid:room_id>/', GetParticipantsView.as_view(), name='participant-list'),
+    path('games/', GetGamesView.as_view(), name='get_games'),
 ]
