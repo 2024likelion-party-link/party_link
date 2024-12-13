@@ -41,7 +41,6 @@ class GetGamesView(APIView):
         games = [
             {"id": "handGame", "name": "손병호 게임"},
             {"id": "imageGame", "name": "이미지 게임"},
-            {"id": "imageGame", "name": "이미지 게임"},
         ]
         return Response({"games": games}, status=status.HTTP_200_OK)
 
