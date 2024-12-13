@@ -41,7 +41,7 @@ class RoomConsumer(AsyncWebsocketConsumer):
         await self.send(json.dumps({
             'type': 'participants',
             'participants': participants
-        }))
+        } , ensure_ascii=False))  # 한글을 그대로 보내도록 설정
 
     async def disconnect(self, close_code):
         if use_redis:
@@ -102,32 +102,50 @@ class RoomConsumer(AsyncWebsocketConsumer):
             }
 
     # 참가자 목록 가져오기
+    # 참가자 목록 가져오기
     async def get_participants(self):
         participants_key = f"room:{self.room_id}:participants"
     
-        # Check if the key exists and its type
+    # Check if the key exists and its type
         if redis_client.exists(participants_key):
             current_type = redis_client.type(participants_key)
             if current_type != b'list':  # Not a list, so reset the key
                 redis_client.delete(participants_key)  # Remove the existing key
 
-        # Ensure the key is now treated as a list (initialize if necessary)
+    # Ensure the key is now treated as a list (initialize if necessary)
         participants = redis_client.lrange(participants_key, 0, -1)
-        
-        # Safely process each participant to avoid IndexError
+    
+    # Safely process each participant to avoid IndexError
         participants_data = []
+        host_added = False  # Track if the host has been added
+    
         for p in participants:
             parts = p.decode('utf-8').split(':')
             if len(parts) == 3:  # Ensure correct format
-                user_id, nickname, is_host = parts
-                participants_data.append({
-                    'userId': user_id,
-                    'nickname': nickname,
-                    'is_host': is_host == 'True'
-                })
+                    user_id, nickname, is_host = parts
+        
+        # Directly use the decoded nickname
+        # No need to re-encode/decode for Unicode escape
+                    nickname = nickname  # Ensure it's already in the right encoding
+        
+        # Check if this participant is the host and ensure only one host is added
+                    if is_host == 'True' and not host_added:
+                        participants_data.append({
+                            'userId': user_id,
+                            'nickname': nickname,
+                            'is_host': True
+                        })
+                        host_added = True  # Mark host as added
+                    elif is_host == 'False':
+                        participants_data.append({
+                            'userId': user_id,
+                            'nickname': nickname,
+                            'is_host': False
+                     })
+        
             else:
-                # Handle any invalid data if needed
-                continue
+            # Handle any invalid data if needed
+                    continue
         
         return participants_data
 
